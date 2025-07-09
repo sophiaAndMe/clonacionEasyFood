@@ -242,7 +242,10 @@ export default function CartScreen() {
                     styles.optionButton,
                     paymentMethod === 'card' && styles.selectedOption
                   ]}
-                  onPress={() => setPaymentMethod('card')}
+                  onPress={() => {
+                    setPaymentMethod('card');
+                    router.push('/cart/credit-card' as any);
+                  }}
                 >
                   <CreditCard 
                     size={20} 
