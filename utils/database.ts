@@ -196,6 +196,64 @@ export const initDatabase = () => {
         FOREIGN KEY(customer_id) REFERENCES customers(id),
         FOREIGN KEY(restaurant_id) REFERENCES restaurants(id)
       );
+
+      -- Tabla de productos
+      CREATE TABLE IF NOT EXISTS Products (
+        id TEXT PRIMARY KEY NOT NULL,
+        restaurant_id TEXT,
+        name TEXT,
+        description TEXT,
+        price DECIMAL(10,2),
+        image_url TEXT,
+        category TEXT,
+        available BOOLEAN DEFAULT 1
+      );
+
+      -- Tablas para órdenes
+      CREATE TABLE IF NOT EXISTS Orders (
+        id TEXT PRIMARY KEY NOT NULL,
+        user_id TEXT,
+        restaurant_id TEXT,
+        status TEXT,
+        total_amount DECIMAL(10,2),
+        delivery_fee DECIMAL(10,2),
+        service_fee DECIMAL(10,2),
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        delivery_address TEXT,
+        customer_name TEXT,
+        customer_phone TEXT,
+        order_number INTEGER
+      );
+
+      CREATE TABLE IF NOT EXISTS OrderItems (
+        id TEXT PRIMARY KEY NOT NULL,
+        order_id TEXT,
+        product_id TEXT,
+        quantity INTEGER,
+        price DECIMAL(10,2),
+        notes TEXT,
+        FOREIGN KEY(order_id) REFERENCES Orders(id),
+        FOREIGN KEY(product_id) REFERENCES Products(id)
+      );
+
+      -- Tablas para el carrito
+      CREATE TABLE IF NOT EXISTS Cart (
+        id TEXT PRIMARY KEY NOT NULL,
+        user_id TEXT,
+        restaurant_id TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS CartItems (
+        id TEXT PRIMARY KEY NOT NULL,
+        cart_id TEXT,
+        product_id TEXT,
+        quantity INTEGER,
+        price DECIMAL(10,2),
+        notes TEXT,
+        FOREIGN KEY(product_id) REFERENCES Products(id),
+        FOREIGN KEY(cart_id) REFERENCES Cart(id)
+      );
     `);
     
     console.log('Tablas creadas exitosamente');
@@ -214,16 +272,21 @@ export const initDatabase = () => {
 // Función para insertar productos de ejemplo de los datos mock
 const insertSampleProducts = () => {
   try {
+    console.log('insertSampleProducts - Iniciando inserción de productos');
+    
     // Verificar si ya hay productos en la tabla
     const productsCount = db.getFirstSync('SELECT COUNT(*) as count FROM Products', []);
+    console.log('insertSampleProducts - Productos existentes:', productsCount);
     
     if (productsCount && (productsCount as any)['count'] > 0) {
-      // Ya hay productos, no necesitamos insertar más
+      console.log('insertSampleProducts - Ya hay productos, no se insertarán más');
       return;
     }
     
+    console.log('insertSampleProducts - Insertando productos desde mockRestaurants');
     // Insertar todos los productos de los restaurantes mock
     mockRestaurants.forEach(restaurant => {
+      console.log(`insertSampleProducts - Procesando restaurante ${restaurant.id}`);
       restaurant.menu.forEach(item => {
         // Convertir la imagen a una URL string para almacenar en la base de datos
         let imageUrl = '';
@@ -234,6 +297,7 @@ const insertSampleProducts = () => {
           // En un caso real, necesitaríamos manejar esto de otra manera
           imageUrl = `${restaurant.id}-${item.id}`;
         }
+        console.log(`insertSampleProducts - Insertando producto ${item.id} (${item.name})`);
         
         try {
           db.runSync(
@@ -273,13 +337,44 @@ export const addToCart = async (
   try {
     await initDatabase(); // Asegurar que la base de datos esté inicializada
     
+    // Verificar que el usuario existe
+    if (!userId) {
+      throw new Error('Usuario no autenticado');
+    }
+
+    const user = db.getFirstSync('SELECT * FROM users WHERE id = ?', [userId]);
+    if (!user) {
+      throw new Error('Usuario no encontrado');
+    }
+    
     console.log('addToCart - Parámetros:', { userId, restaurantId, productId, quantity, price, notes });
     
-    // Buscar carrito existente SOLO para este usuario y restaurante
+    // Primero buscar cualquier carrito activo (con items) del usuario
     let cartResult: any = db.getFirstSync(
-      'SELECT * FROM Cart WHERE user_id = ? AND restaurant_id = ? ORDER BY created_at DESC LIMIT 1',
-      [userId, restaurantId]
+      `SELECT c.* 
+       FROM Cart c 
+       JOIN CartItems ci ON c.id = ci.cart_id 
+       WHERE c.user_id = ? 
+       GROUP BY c.id 
+       ORDER BY c.created_at DESC 
+       LIMIT 1`,
+      [userId]
     );
+
+    // Si encontramos un carrito con items pero es de otro restaurante, lo limpiamos
+    if (cartResult && cartResult.restaurant_id !== restaurantId) {
+      console.log('addToCart - Limpiando carrito anterior de otro restaurante');
+      await clearUserCart(userId);
+      cartResult = null;
+    }
+
+    // Si no hay carrito activo o fue limpiado, buscar el último carrito del usuario para este restaurante
+    if (!cartResult) {
+      cartResult = db.getFirstSync(
+        'SELECT * FROM Cart WHERE user_id = ? AND restaurant_id = ? ORDER BY created_at DESC LIMIT 1',
+        [userId, restaurantId]
+      );
+    }
     
     console.log('addToCart - Carrito encontrado:', cartResult);
     
@@ -340,11 +435,52 @@ export const addToCart = async (
 export const getCartItems = async (userId: string) => {
   try {
     await initDatabase(); // Asegura inicialización
+    console.log('getCartItems - Buscando carrito para usuario:', userId);
+    
+    // Buscar el carrito más reciente para el usuario que tenga items
     const cart: any = db.getFirstSync(
-      'SELECT * FROM Cart WHERE user_id = ? ORDER BY created_at DESC LIMIT 1',
+      `SELECT c.* 
+       FROM Cart c 
+       LEFT JOIN CartItems ci ON c.id = ci.cart_id 
+       WHERE c.user_id = ? 
+       GROUP BY c.id 
+       HAVING COUNT(ci.id) > 0 
+       ORDER BY c.created_at DESC 
+       LIMIT 1`,
       [userId]
     );
-    if (!cart) return []; // Si no hay carrito, retorna array vacío para que la UI muestre estado vacío
+
+    // Si no se encuentra un carrito con items, buscar cualquier carrito del usuario
+    if (!cart) {
+      const anyCart: any = db.getFirstSync(
+        'SELECT * FROM Cart WHERE user_id = ? ORDER BY created_at DESC LIMIT 1',
+        [userId]
+      );
+      if (anyCart) {
+        console.log('getCartItems - Encontrado carrito sin items:', anyCart);
+        return []; // Retornar array vacío si el carrito existe pero no tiene items
+      }
+    }
+
+    console.log('getCartItems - Carrito encontrado:', cart);
+    
+    if (!cart) {
+      console.log('getCartItems - No se encontró carrito');
+      return []; // Si no hay carrito, retorna array vacío para que la UI muestre estado vacío
+    }
+
+    // Primero verificamos que existen las tablas necesarias
+    const tables = db.getAllSync("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('CartItems', 'Products')");
+    console.log('getCartItems - Tablas existentes:', tables);
+
+    // Verificamos los items en CartItems
+    const cartItems = db.getAllSync('SELECT * FROM CartItems WHERE cart_id = ?', [cart.id]);
+    console.log('getCartItems - Items en CartItems:', cartItems);
+
+    // Verificamos los productos en Products
+    const products = db.getAllSync('SELECT * FROM Products WHERE id IN (SELECT product_id FROM CartItems WHERE cart_id = ?)', [cart.id]);
+    console.log('getCartItems - Productos encontrados:', products);
+
     const items = db.getAllSync(
       `SELECT 
           ci.id AS id,
@@ -357,12 +493,14 @@ export const getCartItems = async (userId: string) => {
           p.image_url,
           p.restaurant_id
        FROM CartItems ci
-       JOIN Products p ON ci.product_id = p.id
+       LEFT JOIN Products p ON ci.product_id = p.id
        WHERE ci.cart_id = ?`,
       [cart.id]
     );
+    console.log('getCartItems - Items finales:', items);
+
     // Normaliza la imagen: si es ruta local, la UI debe usar require, si es URL, usar string
-    return items.map((item: any) => {
+    const mappedItems = items.map((item: any) => {
       let imageType = 'unknown';
       if (typeof item.image_url === 'string') {
         if (item.image_url.startsWith('http')) {
@@ -378,6 +516,9 @@ export const getCartItems = async (userId: string) => {
         imageType,
       };
     });
+    
+    console.log('getCartItems - Items mapeados finales:', mappedItems);
+    return mappedItems;
   } catch (error) {
     console.error('Error getting cart items:', error);
     return []; // Siempre retorna array vacío en error para que la UI no crashee

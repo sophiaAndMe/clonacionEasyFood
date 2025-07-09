@@ -36,10 +36,27 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
   // Obtener el userId real al inicio
   useEffect(() => {
     const fetchUserId = async () => {
-      const email = await AsyncStorage.getItem('userEmail');
-      if (!email) return;
-      const user: any = await Database.getUserByEmail(email);
-      if (user && user.id) setUserId(user.id);
+      try {
+        const email = await AsyncStorage.getItem('userEmail');
+        if (!email) {
+          console.log('No hay email guardado en AsyncStorage');
+          // Redirigir al login o mostrar mensaje
+          Alert.alert('Error', 'Por favor inicia sesión para continuar');
+          return;
+        }
+        
+        const user: any = await Database.getUserByEmail(email);
+        if (user && user.id) {
+          console.log('Usuario encontrado:', user.id);
+          setUserId(user.id);
+        } else {
+          console.log('No se encontró el usuario en la base de datos');
+          Alert.alert('Error', 'Usuario no encontrado. Por favor inicia sesión nuevamente.');
+        }
+      } catch (error) {
+        console.error('Error obteniendo userId:', error);
+        Alert.alert('Error', 'Hubo un problema al cargar tu información. Por favor inicia sesión nuevamente.');
+      }
     };
     fetchUserId();
   }, []);
@@ -80,13 +97,35 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
   }, [userId]);
 
   const addItem = async (product: any, quantity: number, notes: string = '') => {
-    if (!userId) {
-      console.log('addItem - No hay userId disponible');
-      Alert.alert('Error', 'Usuario no autenticado');
-      return;
-    }
-    
     try {
+      // Verificar autenticación primero
+      const email = await AsyncStorage.getItem('userEmail');
+      if (!email) {
+        console.log('addItem - No hay email en AsyncStorage');
+        Alert.alert('Error', 'Por favor inicia sesión para agregar productos al carrito');
+        return;
+      }
+
+      // Asegurarse de tener un userId válido
+      let currentUserId: string | null = userId;
+      if (!currentUserId) {
+        const user: any = await Database.getUserByEmail(email);
+        if (!user || !user.id) {
+          console.log('addItem - No se pudo obtener el usuario');
+          Alert.alert('Error', 'No se pudo verificar tu usuario. Por favor inicia sesión nuevamente.');
+          return;
+        }
+        currentUserId = user.id;
+        setUserId(currentUserId);
+      }
+
+      // Verificación de seguridad adicional
+      if (!currentUserId) {
+        console.log('addItem - No se pudo establecer un userId válido');
+        Alert.alert('Error', 'No se pudo verificar tu usuario. Por favor inicia sesión nuevamente.');
+        return;
+      }
+
       console.log('addItem - Iniciando con producto:', product);
       
       const restaurantId = product.restaurant_id ?? product.restaurantId;
@@ -103,8 +142,7 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
         await clearCart();
       }
       
-      // Conversión explícita de IDs a string para evitar datatype mismatch
-      const userIdStr = userId.toString();
+      const userIdStr = currentUserId.toString();
       const restaurantIdStr = restaurantId.toString();
       const productIdStr = product.id.toString();
       
