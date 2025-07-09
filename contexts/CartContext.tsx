@@ -24,6 +24,7 @@ interface CartContextType {
   total: number;
   isLoading: boolean;
   reloadCart: () => Promise<void>; // <-- Nueva función para recargar el carrito
+  refreshUser: () => Promise<void>; // <-- Nueva función para refrescar usuario después del login
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
@@ -33,13 +34,48 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [userId, setUserId] = useState<string | null>(null);
 
-  // Obtener el userId real al inicio
+  // Obtener el userId real al inicio o crear usuario invitado
   useEffect(() => {
     const fetchUserId = async () => {
-      const email = await AsyncStorage.getItem('userEmail');
-      if (!email) return;
-      const user: any = await Database.getUserByEmail(email);
-      if (user && user.id) setUserId(user.id);
+      try {
+        const email = await AsyncStorage.getItem('userEmail');
+        if (email) {
+          // Usuario autenticado
+          const user: any = await Database.getUserByEmail(email);
+          if (user && user.id) {
+            // Verificar si hay carrito de usuario invitado para migrar
+            const guestUserId = await AsyncStorage.getItem('guestUserId');
+            if (guestUserId && guestUserId !== user.id) {
+              console.log('CartProvider - Migrando carrito de usuario invitado');
+              await Database.migrateGuestCartToUser(guestUserId, user.id);
+              await AsyncStorage.removeItem('guestUserId');
+            }
+            
+            setUserId(user.id);
+            return;
+          }
+        }
+        
+        // No hay usuario autenticado, crear/usar usuario invitado
+        let guestUserId = await AsyncStorage.getItem('guestUserId');
+        if (!guestUserId) {
+          // Crear nuevo usuario invitado
+          guestUserId = await Database.createGuestUser();
+          if (guestUserId) {
+            await AsyncStorage.setItem('guestUserId', guestUserId);
+            console.log('CartProvider - Usuario invitado creado:', guestUserId);
+          }
+        }
+        
+        setUserId(guestUserId);
+        console.log('CartProvider - Usando usuario invitado:', guestUserId);
+      } catch (error) {
+        console.error('CartProvider - Error obteniendo userId:', error);
+        // En caso de error, crear un userId temporal
+        const tempUserId = 'temp-' + Date.now();
+        setUserId(tempUserId);
+        console.log('CartProvider - Usando userId temporal:', tempUserId);
+      }
     };
     fetchUserId();
   }, []);
@@ -82,7 +118,7 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
   const addItem = async (product: any, quantity: number, notes: string = '') => {
     if (!userId) {
       console.log('addItem - No hay userId disponible');
-      Alert.alert('Error', 'Usuario no autenticado');
+      Alert.alert('Error', 'Error del sistema. Por favor intenta nuevamente.');
       return;
     }
     
@@ -178,6 +214,34 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
+  // Función para refrescar usuario después del login
+  const refreshUser = async () => {
+    try {
+      const email = await AsyncStorage.getItem('userEmail');
+      if (email) {
+        // Usuario autenticado
+        const user: any = await Database.getUserByEmail(email);
+        if (user && user.id) {
+          // Verificar si hay carrito de usuario invitado para migrar
+          const guestUserId = await AsyncStorage.getItem('guestUserId');
+          if (guestUserId && guestUserId !== user.id) {
+            console.log('refreshUser - Migrando carrito de usuario invitado');
+            await Database.migrateGuestCartToUser(guestUserId, user.id);
+            await AsyncStorage.removeItem('guestUserId');
+          }
+          
+          setUserId(user.id);
+          console.log('refreshUser - Usuario actualizado:', user.id);
+          return;
+        }
+      }
+      
+      console.log('refreshUser - No hay usuario autenticado, manteniendo estado actual');
+    } catch (error) {
+      console.error('refreshUser - Error:', error);
+    }
+  };
+
   // Calculamos solo el subtotal de los items sin gastos de envío
   const total = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
 
@@ -191,6 +255,7 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
         total,
         isLoading,
         reloadCart: loadCartItems, // <-- Exponer función para recargar
+        refreshUser, // <-- Exponer función para refrescar usuario
       }}
     >
       {children}

@@ -619,3 +619,58 @@ export const clearUserCart = async (userId: string) => {
     }
   });
 };
+
+// Crear usuario invitado para permitir uso del carrito sin autenticación
+export const createGuestUser = async (): Promise<string> => {
+  try {
+    const guestUserId = `guest-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const guestEmail = `guest-${Date.now()}@easyfood.local`;
+    
+    // Crear usuario invitado en la tabla users
+    db.runSync(
+      'INSERT INTO users (id, email, password, role, name) VALUES (?, ?, ?, ?, ?)',
+      [guestUserId, guestEmail, 'guest', 'customer', 'Usuario Invitado']
+    );
+    
+    console.log('createGuestUser - Usuario invitado creado:', guestUserId);
+    return guestUserId;
+  } catch (error) {
+    console.error('createGuestUser - Error:', error);
+    throw new Error('No se pudo crear usuario invitado');
+  }
+};
+
+// Migrar carrito de usuario invitado a usuario autenticado
+export const migrateGuestCartToUser = async (guestUserId: string, authUserId: string): Promise<void> => {
+  try {
+    console.log('migrateGuestCartToUser - Migrando carrito de', guestUserId, 'a', authUserId);
+    
+    // Obtener items del carrito del usuario invitado
+    const guestCartItems = await getCartItems(guestUserId);
+    
+    if (guestCartItems.length > 0) {
+      // Limpiar carrito del usuario autenticado primero
+      await clearUserCart(authUserId);
+      
+      // Migrar cada item al nuevo usuario
+      for (const item of guestCartItems) {
+        await addToCart(
+          authUserId,
+          item.restaurant_id || item.restaurantId || '',
+          item.product_id,
+          item.quantity,
+          item.price,
+          item.notes || ''
+        );
+      }
+      
+      // Limpiar carrito del usuario invitado después de migrar
+      await clearUserCart(guestUserId);
+      
+      console.log('migrateGuestCartToUser - Migración completada');
+    }
+  } catch (error) {
+    console.error('migrateGuestCartToUser - Error:', error);
+    // No lanzar error para no bloquear el login
+  }
+};
