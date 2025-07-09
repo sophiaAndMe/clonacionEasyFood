@@ -95,7 +95,10 @@ Para generar el archivo APK para Android, sigue estos pasos:
 
 2. **Configura la construcción**:
    ```bash
-   # Inicializa la configuración de EAS
+   # NOTA: Si encuentras errores de permisos, primero debes:
+   # 1. Crear una nueva cuenta en https://expo.dev
+   # 2. Cambiar el slug en app.json a un nombre único
+   # 3. Luego inicializar la configuración de EAS
    eas build:configure
    ```
 
@@ -118,16 +121,35 @@ Para generar el archivo APK para Android, sigue estos pasos:
 
 ### Solución de problemas comunes en la construcción
 
-1. **Error de permisos**: Asegúrate de que el archivo `app.json` tenga todos los permisos necesarios:
+1. **Error de permisos/autenticación con EAS**:
+   ```bash
+   # Si ves el error "Entity not authorized", significa que el proyecto
+   # está vinculado a otra cuenta. Solución:
+   
+   # 1. Crea una cuenta nueva en https://expo.dev
+   # 2. Cambia el slug en app.json a un nombre único (ya actualizado a "easyfood-app-laver")
+   # 3. Limpia la configuración anterior
+   rm -rf .expo
+   
+   # 4. Inicia sesión con tu nueva cuenta
+   eas logout
+   eas login
+   
+   # 5. Configura el proyecto nuevamente
+   eas build:configure
+   ```
+
+2. **Error de permisos**: Asegúrate de que el archivo `app.json` tenga todos los permisos necesarios:
+2. **Error de permisos**: Asegúrate de que el archivo `app.json` tenga todos los permisos necesarios:
    - "INTERNET"
    - "ACCESS_COARSE_LOCATION"
    - "ACCESS_FINE_LOCATION"
 
-2. **Error con el mapa**: Verifica que la API key de Google Maps esté correctamente configurada en:
+3. **Error con el mapa**: Verifica que la API key de Google Maps esté correctamente configurada en:
    - `app.json` en la sección de android.config.googleMaps.apiKey
    - Las variables de entorno bajo "extra.googleMapsApiKey"
 
-3. **Error de construcción**:
+4. **Error de construcción**:
    ```bash
    # Limpia la caché y los módulos
    rm -rf node_modules
@@ -136,9 +158,22 @@ Para generar el archivo APK para Android, sigue estos pasos:
    npm install
    ```
 
-4. **Error de assets**:
+5. **Error de assets**:
    - Asegúrate de que todos los assets estén incluidos en "assetBundlePatterns" en `app.json`
    - Verifica que las imágenes estén en los formatos correctos (png, jpg)
+
+6. **Error de base de datos SQLite "no such table"**:
+   ```bash
+   # Este error ocurre cuando la base de datos no se inicializa correctamente en el APK
+   # La solución ya está implementada en el código, pero si persiste:
+   
+   # 1. Verifica que la inicialización esté en _layout.tsx (ya implementado)
+   # 2. Limpia el build y reconstruye:
+   rm -rf .expo
+   rm -rf node_modules
+   npm install
+   eas build -p android --profile preview --clear-cache
+   ```
 
 ## Estructura del proyecto
 

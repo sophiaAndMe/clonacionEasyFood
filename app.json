@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "EasyFood",
-    "slug": "easyfood-app-joel7121",
+    "slug": "easyfood-app-laver",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -60,9 +60,8 @@
       "googleMapsApiKey": "AIzaSyAHDnMOx1QWZvmq1ZaVpYK6JTE9G9v-a3A",
       "router": {},
       "eas": {
-        "projectId": "673970af-5bb1-4b2a-a3b0-07de7a325dc8"
+        "projectId": "b8334fb8-206d-4032-bc53-e0bdc2726465"
       }
-    },
-    "owner": "joel7121"
+    }
   }
 }

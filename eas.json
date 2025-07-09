@@ -1,6 +1,6 @@
 {
   "cli": {
-    "version": ">= 3.13.3",
+    "version": ">= 16.14.1",
     "appVersionSource": "remote"
   },
   "build": {
@@ -9,13 +9,7 @@
       "distribution": "internal"
     },
     "preview": {
-      "android": {
-        "buildType": "apk"
-      },
-      "distribution": "internal",
-      "env": {
-        "EXPO_PUBLIC_API_URL": "https://api.easyfood.com"
-      }
+      "distribution": "internal"
     },
     "production": {
       "autoIncrement": true

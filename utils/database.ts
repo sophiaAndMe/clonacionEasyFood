@@ -7,68 +7,126 @@ const db = SQLite.openDatabaseSync('mydatabase.db');
 
 // --- MIGRACIÓN: Agregar campo name si no existe ---
 const migrateAddNameField = () => {
-  const userTableInfo = db.getAllSync("PRAGMA table_info(users)");
-  const hasName = userTableInfo.some((col: any) => col.name === 'name');
-  if (!hasName) {
-    db.runSync('ALTER TABLE users ADD COLUMN name TEXT');
+  try {
+    // Primero verificar si la tabla users existe
+    const tables = db.getAllSync("SELECT name FROM sqlite_master WHERE type='table' AND name='users'");
+    if (tables.length === 0) {
+      console.log('Tabla users no existe, se creará más adelante');
+      return;
+    }
+    
+    const userTableInfo = db.getAllSync("PRAGMA table_info(users)");
+    const hasName = userTableInfo.some((col: any) => col.name === 'name');
+    if (!hasName) {
+      console.log('Agregando campo name a tabla users');
+      db.runSync('ALTER TABLE users ADD COLUMN name TEXT');
+    }
+  } catch (error) {
+    console.log('Error en migración de campo name:', error);
   }
 };
 
 // MIGRACIÓN: Cambia todas las tablas antiguas a usar IDs TEXT (UUID/string)
 export const migrateCartAndOrdersToText = () => {
-  // Cart
-  db.runSync('CREATE TABLE IF NOT EXISTS Cart_new (id TEXT PRIMARY KEY NOT NULL, user_id TEXT, restaurant_id TEXT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)');
-  db.runSync('INSERT INTO Cart_new (id, user_id, restaurant_id, created_at) SELECT CAST(id AS TEXT), CAST(user_id AS TEXT), CAST(restaurant_id AS TEXT), created_at FROM Cart');
-  db.runSync('DROP TABLE IF EXISTS Cart');
-  db.runSync('ALTER TABLE Cart_new RENAME TO Cart');
+  try {
+    // Verificar si las tablas antiguas existen antes de migrar
+    const tables = db.getAllSync("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('Cart', 'CartItems', 'Orders', 'OrderItems', 'Products')");
+    const existingTables = tables.map((t: any) => t.name);
+    
+    if (existingTables.length === 0) {
+      console.log('No hay tablas antiguas que migrar');
+      return;
+    }
+    
+    console.log('Migrando tablas:', existingTables);
+    
+    // Cart
+    if (existingTables.includes('Cart')) {
+      db.runSync('CREATE TABLE IF NOT EXISTS Cart_new (id TEXT PRIMARY KEY NOT NULL, user_id TEXT, restaurant_id TEXT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)');
+      db.runSync('INSERT INTO Cart_new (id, user_id, restaurant_id, created_at) SELECT CAST(id AS TEXT), CAST(user_id AS TEXT), CAST(restaurant_id AS TEXT), created_at FROM Cart');
+      db.runSync('DROP TABLE IF EXISTS Cart');
+      db.runSync('ALTER TABLE Cart_new RENAME TO Cart');
+    }
 
-  // CartItems
-  db.runSync('CREATE TABLE IF NOT EXISTS CartItems_new (id TEXT PRIMARY KEY NOT NULL, cart_id TEXT, product_id TEXT, quantity INTEGER, price DECIMAL(10,2), notes TEXT)');
-  db.runSync('INSERT INTO CartItems_new (id, cart_id, product_id, quantity, price, notes) SELECT CAST(id AS TEXT), CAST(cart_id AS TEXT), CAST(product_id AS TEXT), quantity, price, notes FROM CartItems');
-  db.runSync('DROP TABLE IF EXISTS CartItems');
-  db.runSync('ALTER TABLE CartItems_new RENAME TO CartItems');
+    // CartItems
+    if (existingTables.includes('CartItems')) {
+      db.runSync('CREATE TABLE IF NOT EXISTS CartItems_new (id TEXT PRIMARY KEY NOT NULL, cart_id TEXT, product_id TEXT, quantity INTEGER, price DECIMAL(10,2), notes TEXT)');
+      db.runSync('INSERT INTO CartItems_new (id, cart_id, product_id, quantity, price, notes) SELECT CAST(id AS TEXT), CAST(cart_id AS TEXT), CAST(product_id AS TEXT), quantity, price, notes FROM CartItems');
+      db.runSync('DROP TABLE IF EXISTS CartItems');
+      db.runSync('ALTER TABLE CartItems_new RENAME TO CartItems');
+    }
 
-  // Orders
-  db.runSync('CREATE TABLE IF NOT EXISTS Orders_new (id TEXT PRIMARY KEY NOT NULL, user_id TEXT, restaurant_id TEXT, status TEXT, total_amount DECIMAL(10,2), delivery_fee DECIMAL(10,2), service_fee DECIMAL(10,2), created_at DATETIME DEFAULT CURRENT_TIMESTAMP, delivery_address TEXT, customer_name TEXT, customer_phone TEXT)');
-  db.runSync('INSERT INTO Orders_new (id, user_id, restaurant_id, status, total_amount, delivery_fee, service_fee, created_at, delivery_address, customer_name, customer_phone) SELECT CAST(id AS TEXT), CAST(user_id AS TEXT), CAST(restaurant_id AS TEXT), status, total_amount, delivery_fee, service_fee, created_at, delivery_address, customer_name, customer_phone FROM Orders');
-  db.runSync('DROP TABLE IF EXISTS Orders');
-  db.runSync('ALTER TABLE Orders_new RENAME TO Orders');
+    // Orders
+    if (existingTables.includes('Orders')) {
+      db.runSync('CREATE TABLE IF NOT EXISTS Orders_new (id TEXT PRIMARY KEY NOT NULL, user_id TEXT, restaurant_id TEXT, status TEXT, total_amount DECIMAL(10,2), delivery_fee DECIMAL(10,2), service_fee DECIMAL(10,2), created_at DATETIME DEFAULT CURRENT_TIMESTAMP, delivery_address TEXT, customer_name TEXT, customer_phone TEXT)');
+      db.runSync('INSERT INTO Orders_new (id, user_id, restaurant_id, status, total_amount, delivery_fee, service_fee, created_at, delivery_address, customer_name, customer_phone) SELECT CAST(id AS TEXT), CAST(user_id AS TEXT), CAST(restaurant_id AS TEXT), status, total_amount, delivery_fee, service_fee, created_at, delivery_address, customer_name, customer_phone FROM Orders');
+      db.runSync('DROP TABLE IF EXISTS Orders');
+      db.runSync('ALTER TABLE Orders_new RENAME TO Orders');
+    }
 
-  // OrderItems
-  db.runSync('CREATE TABLE IF NOT EXISTS OrderItems_new (id TEXT PRIMARY KEY NOT NULL, order_id TEXT, product_id TEXT, quantity INTEGER, price DECIMAL(10,2), notes TEXT)');
-  db.runSync('INSERT INTO OrderItems_new (id, order_id, product_id, quantity, price, notes) SELECT CAST(id AS TEXT), CAST(order_id AS TEXT), CAST(product_id AS TEXT), quantity, price, notes FROM OrderItems');
-  db.runSync('DROP TABLE IF EXISTS OrderItems');
-  db.runSync('ALTER TABLE OrderItems_new RENAME TO OrderItems');
+    // OrderItems
+    if (existingTables.includes('OrderItems')) {
+      db.runSync('CREATE TABLE IF NOT EXISTS OrderItems_new (id TEXT PRIMARY KEY NOT NULL, order_id TEXT, product_id TEXT, quantity INTEGER, price DECIMAL(10,2), notes TEXT)');
+      db.runSync('INSERT INTO OrderItems_new (id, order_id, product_id, quantity, price, notes) SELECT CAST(id AS TEXT), CAST(order_id AS TEXT), CAST(product_id AS TEXT), quantity, price, notes FROM OrderItems');
+      db.runSync('DROP TABLE IF EXISTS OrderItems');
+      db.runSync('ALTER TABLE OrderItems_new RENAME TO OrderItems');
+    }
 
-  // Products
-  db.runSync('CREATE TABLE IF NOT EXISTS Products_new (id TEXT PRIMARY KEY NOT NULL, restaurant_id TEXT, name TEXT, description TEXT, price DECIMAL(10,2), image_url TEXT, category TEXT, available BOOLEAN DEFAULT 1)');
-  db.runSync('INSERT INTO Products_new (id, restaurant_id, name, description, price, image_url, category, available) SELECT CAST(id AS TEXT), CAST(restaurant_id AS TEXT), name, description, price, image_url, category, available FROM Products');
-  db.runSync('DROP TABLE IF EXISTS Products');
-  db.runSync('ALTER TABLE Products_new RENAME TO Products');
+    // Products
+    if (existingTables.includes('Products')) {
+      db.runSync('CREATE TABLE IF NOT EXISTS Products_new (id TEXT PRIMARY KEY NOT NULL, restaurant_id TEXT, name TEXT, description TEXT, price DECIMAL(10,2), image_url TEXT, category TEXT, available BOOLEAN DEFAULT 1)');
+      db.runSync('INSERT INTO Products_new (id, restaurant_id, name, description, price, image_url, category, available) SELECT CAST(id AS TEXT), CAST(restaurant_id AS TEXT), name, description, price, image_url, category, available FROM Products');
+      db.runSync('DROP TABLE IF EXISTS Products');
+      db.runSync('ALTER TABLE Products_new RENAME TO Products');
+    }
+  } catch (error) {
+    console.log('Error en migración de tablas:', error);
+  }
 };
 
 // MIGRACIÓN: Añadir campo order_number incremental si no existe
 const migrateAddOrderNumber = () => {
-  const orderTableInfo = db.getAllSync("PRAGMA table_info(Orders)");
-  const hasOrderNumber = orderTableInfo.some((col: any) => col.name === 'order_number');
-  if (!hasOrderNumber) {
-    db.runSync('ALTER TABLE Orders ADD COLUMN order_number INTEGER');
-    // Asignar números incrementales a pedidos existentes
-    const orders = db.getAllSync('SELECT id FROM Orders ORDER BY created_at ASC');
-    orders.forEach((order: any, idx: number) => {
-      db.runSync('UPDATE Orders SET order_number = ? WHERE id = ?', [idx + 1, order.id]);
-    });
+  try {
+    // Verificar si la tabla Orders existe
+    const tables = db.getAllSync("SELECT name FROM sqlite_master WHERE type='table' AND name='Orders'");
+    if (tables.length === 0) {
+      console.log('Tabla Orders no existe, se creará más adelante');
+      return;
+    }
+    
+    const orderTableInfo = db.getAllSync("PRAGMA table_info(Orders)");
+    const hasOrderNumber = orderTableInfo.some((col: any) => col.name === 'order_number');
+    if (!hasOrderNumber) {
+      console.log('Agregando campo order_number a tabla Orders');
+      db.runSync('ALTER TABLE Orders ADD COLUMN order_number INTEGER');
+      // Asignar números incrementales a pedidos existentes
+      const orders = db.getAllSync('SELECT id FROM Orders ORDER BY created_at ASC');
+      orders.forEach((order: any, idx: number) => {
+        db.runSync('UPDATE Orders SET order_number = ? WHERE id = ?', [idx + 1, order.id]);
+      });
+    }
+  } catch (error) {
+    console.log('Error en migración de order_number:', error);
   }
 };
 
 // Inicializar tablas
 let dbInitialized = false;
 export const initDatabase = () => {
-  if (dbInitialized) return;
+  if (dbInitialized) {
+    console.log('Base de datos ya inicializada');
+    return;
+  }
+  
+  console.log('Iniciando configuración de la base de datos...');
+  
   try {
+    console.log('Ejecutando migraciones...');
     migrateAddNameField();
     migrateCartAndOrdersToText();
     migrateAddOrderNumber();
+    
+    console.log('Creando tablas...');
     db.execSync(`
       -- ESTRUCTURA EASYFOOD RELACIONAL
       CREATE TABLE IF NOT EXISTS users (
@@ -139,11 +197,17 @@ export const initDatabase = () => {
         FOREIGN KEY(restaurant_id) REFERENCES restaurants(id)
       );
     `);
+    
+    console.log('Tablas creadas exitosamente');
     dbInitialized = true;
+    
     // Insertar productos de ejemplo
+    console.log('Insertando productos de ejemplo...');
     insertSampleProducts();
+    console.log('Base de datos inicializada completamente');
   } catch (error) {
     console.error('Error initializing database:', error);
+    throw error; // Re-lanzar el error para que se pueda manejar en el nivel superior
   }
 };
 

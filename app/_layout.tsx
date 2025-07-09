@@ -4,6 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import { View, LogBox, Platform, Text, ActivityIndicator } from 'react-native';
 import { useFrameworkReady } from '@/hooks/useFrameworkReady';
 import { CartProvider } from '@/contexts/CartContext'; // Importamos CartProvider
+import { initDatabase } from '@/utils/database'; // Importamos la función de inicialización de la base de datos
 
 // Ignorar advertencias específicas
 LogBox.ignoreLogs([
@@ -21,6 +22,11 @@ export default function RootLayout() {
   useEffect(() => {
     async function prepare() {
       try {
+        // Inicializar la base de datos PRIMERO
+        console.log('Inicializando base de datos...');
+        initDatabase();
+        console.log('Base de datos inicializada correctamente');
+        
         // Esperar a que todo esté listo
         await Promise.all([
           frameworkReady,
