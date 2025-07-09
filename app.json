@@ -1,0 +1,68 @@
+{
+  "expo": {
+    "name": "EasyFood",
+    "slug": "easyfood-app-joel7121",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./assets/login/Logo EASYFOOD.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "assetBundlePatterns": [
+      "assets/images/*",
+      "assets/login/*",
+      "assets/fotoComida-1/*",
+      "assets/fotoComida-2/*",
+      "assets/fotoComida-3/*",
+      "assets/fotoComida-4/*",
+      "assets/fotoComida-5/*",
+      "assets/fotoRestaurante/*",
+      "assets/fotos-portadaLogo/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.easyfood.app"
+    },
+    "android": {
+      "package": "com.easyfood.app",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "INTERNET"
+      ],
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyAHDnMOx1QWZvmq1ZaVpYK6JTE9G9v-a3A"
+        }
+      }
+    },
+    "web": {
+      "bundler": "metro",
+      "favicon": "./assets/images/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-font",
+      "expo-web-browser",
+      "expo-sqlite"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "googleMapsApiKey": "AIzaSyAHDnMOx1QWZvmq1ZaVpYK6JTE9G9v-a3A",
+      "router": {},
+      "eas": {
+        "projectId": "673970af-5bb1-4b2a-a3b0-07de7a325dc8"
+      }
+    },
+    "owner": "joel7121"
+  }
+}
