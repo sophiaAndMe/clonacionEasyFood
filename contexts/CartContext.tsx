@@ -200,6 +200,8 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
+
+  //asdasdasdsa
   const clearCart = async () => {
     if (!userId) return;
     try {
