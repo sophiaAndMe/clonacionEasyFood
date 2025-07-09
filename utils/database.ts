@@ -262,7 +262,7 @@ const insertSampleProducts = () => {
 };
 
 // Función para agregar un producto al carrito
-export const addToCart = (
+export const addToCart = async (
   userId: string,
   restaurantId: string,
   productId: string,
@@ -271,45 +271,68 @@ export const addToCart = (
   notes: string = ''
 ) => {
   try {
+    await initDatabase(); // Asegurar que la base de datos esté inicializada
+    
+    console.log('addToCart - Parámetros:', { userId, restaurantId, productId, quantity, price, notes });
+    
     // Buscar carrito existente SOLO para este usuario y restaurante
     let cartResult: any = db.getFirstSync(
       'SELECT * FROM Cart WHERE user_id = ? AND restaurant_id = ? ORDER BY created_at DESC LIMIT 1',
       [userId, restaurantId]
     );
+    
+    console.log('addToCart - Carrito encontrado:', cartResult);
+    
     let cartId = cartResult?.id;
+    
     // Si no hay carrito, crear uno nuevo con UUID
     if (!cartId) {
       cartId = uuid.v4();
+      console.log('addToCart - Creando nuevo carrito con ID:', cartId);
       db.runSync(
         'INSERT INTO Cart (id, user_id, restaurant_id) VALUES (?, ?, ?)',
         [cartId, userId, restaurantId]
       );
     }
+    
     // Validación extra: si aún no hay cartId, lanzar error explícito
     if (!cartId) {
       throw new Error('No se pudo crear el carrito para el usuario');
     }
+    
     // Verificar si el producto ya está en el carrito
     const item: any = db.getFirstSync(
       'SELECT * FROM CartItems WHERE cart_id = ? AND product_id = ?',
       [cartId, productId]
     );
+    
+    console.log('addToCart - Item existente:', item);
+    
     if (item) {
       const newQuantity = item.quantity + quantity;
+      console.log('addToCart - Nueva cantidad:', newQuantity);
+      
       if (newQuantity <= 0) {
+        console.log('addToCart - Eliminando item del carrito');
         db.runSync('DELETE FROM CartItems WHERE id = ?', [item.id]);
       } else {
+        console.log('addToCart - Actualizando cantidad del item');
         db.runSync('UPDATE CartItems SET quantity = ? WHERE id = ?', [newQuantity, item.id]);
       }
     } else if (quantity > 0) {
       const cartItemId = uuid.v4();
+      console.log('addToCart - Creando nuevo item con ID:', cartItemId);
       db.runSync(
         'INSERT INTO CartItems (id, cart_id, product_id, quantity, price, notes) VALUES (?, ?, ?, ?, ?, ?)',
         [cartItemId, cartId, productId, quantity, price, notes]
       );
     }
+    
+    console.log('addToCart - Operación completada exitosamente');
+    return true;
   } catch (error) {
-    console.error('Error adding to cart:', error);
+    console.error('addToCart - Error:', error);
+    throw error; // Re-lanzar el error para que sea manejado por el contexto
   }
 };
 
@@ -362,13 +385,19 @@ export const getCartItems = async (userId: string) => {
 };
 
 // Eliminar item del carrito
-export const removeFromCart = (cartItemId: string) => {
+export const removeFromCart = async (cartItemId: string) => {
   try {
-    db.runSync('DELETE FROM CartItems WHERE id = ?', [cartItemId]);
+    await initDatabase(); // Asegurar que la base de datos esté inicializada
+    
+    console.log('removeFromCart - Eliminando item:', cartItemId);
+    
+    const result = db.runSync('DELETE FROM CartItems WHERE id = ?', [cartItemId]);
+    
+    console.log('removeFromCart - Resultado:', result);
     return true;
   } catch (error) {
-    console.log('Error al eliminar del carrito:', error);
-    return true;
+    console.error('removeFromCart - Error:', error);
+    throw error; // Re-lanzar el error para manejo apropiado
   }
 };
 

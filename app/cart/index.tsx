@@ -7,7 +7,6 @@ import { mockRestaurants } from '@/data/mockData';
 import { useCart } from '@/contexts/CartContext';
 import { createOrder, updateOrderStatus } from '@/utils/database';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { ordersEventEmitter } from '../(tabs)/orders';
 
 export default function CartScreen() {
   const router = useRouter();
@@ -31,23 +30,46 @@ export default function CartScreen() {
 
   // Handlers de cantidad
   const handleIncreaseQuantity = async (item: any) => {
-    if (updatingItemId || isSubmitting) return;
+    if (updatingItemId || isSubmitting) {
+      console.log('handleIncreaseQuantity - Operación en progreso, ignorando');
+      return;
+    }
+    
     setUpdatingItemId(item.id);
     try {
+      console.log('handleIncreaseQuantity - Aumentando cantidad para item:', item);
       await addItem(item, 1, item.notes || '');
+      console.log('handleIncreaseQuantity - Cantidad aumentada exitosamente');
+    } catch (error) {
+      console.error('handleIncreaseQuantity - Error:', error);
+      Alert.alert('Error', 'No se pudo aumentar la cantidad del producto');
     } finally {
       setUpdatingItemId(null);
     }
   };
+  
   const handleDecreaseQuantity = async (item: any) => {
-    if (updatingItemId || isSubmitting) return;
+    if (updatingItemId || isSubmitting) {
+      console.log('handleDecreaseQuantity - Operación en progreso, ignorando');
+      return;
+    }
+    
     setUpdatingItemId(item.id);
     try {
+      console.log('handleDecreaseQuantity - Disminuyendo cantidad para item:', item);
+      
       if (item.quantity === 1) {
+        console.log('handleDecreaseQuantity - Cantidad es 1, eliminando item');
         await removeItem(item.id);
+        console.log('handleDecreaseQuantity - Item eliminado exitosamente');
       } else {
+        console.log('handleDecreaseQuantity - Disminuyendo cantidad en 1');
         await addItem(item, -1, item.notes || '');
+        console.log('handleDecreaseQuantity - Cantidad disminuida exitosamente');
       }
+    } catch (error) {
+      console.error('handleDecreaseQuantity - Error:', error);
+      Alert.alert('Error', 'No se pudo disminuir la cantidad del producto');
     } finally {
       setUpdatingItemId(null);
     }

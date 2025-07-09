@@ -7,7 +7,7 @@ import { mockRestaurants } from '@/data/mockData';
 import { useCart } from '@/contexts/CartContext';
 
 interface MenuItem {
-  id: number;
+  id: number | string; // Permitir tanto number como string
   name: string;
   description: string;
   price: number;
@@ -16,7 +16,7 @@ interface MenuItem {
 }
 
 interface Restaurant {
-  id: number;
+  id: number | string; // Permitir tanto number como string
   name: string;
   cuisine: string;
   rating: number;
@@ -109,22 +109,42 @@ export default function RestaurantScreen() {
 
   // Función para agregar un item al carrito
   const handleAddItem = async (item: MenuItem) => {
-    await addItem({ ...item, restaurant_id: restaurant.id }, 1);
-    // El context se actualiza automáticamente después de addItem
+    try {
+      console.log('handleAddItem - Agregando item:', item);
+      await addItem({ ...item, restaurant_id: restaurant.id }, 1);
+      console.log('handleAddItem - Item agregado exitosamente');
+    } catch (error) {
+      console.error('handleAddItem - Error:', error);
+      // El error ya se maneja en el context, solo logging aquí
+    }
   };
 
   // Función para remover un item del carrito
   const handleRemoveItem = async (item: MenuItem) => {
-    const found = items.find(i => i.product_id === item.id);
-    if (found) {
-      await removeItem(found.id);
-      // El context se actualiza automáticamente después de removeItem
+    try {
+      console.log('handleRemoveItem - Removiendo item:', item);
+      const productIdStr = item.id.toString();
+      const found = items.find(i => i.product_id === productIdStr);
+      console.log('handleRemoveItem - Item encontrado en carrito:', found);
+      
+      if (found) {
+        await removeItem(found.id);
+        console.log('handleRemoveItem - Item removido exitosamente');
+      } else {
+        console.log('handleRemoveItem - Item no encontrado en carrito');
+      }
+    } catch (error) {
+      console.error('handleRemoveItem - Error:', error);
+      // El error ya se maneja en el context, solo logging aquí
     }
   };
 
-  const getQuantity = (productId: number) => {
-    const found = items.find(i => i.product_id === productId);
-    return found ? found.quantity : 0;
+  const getQuantity = (productId: number | string) => {
+    const productIdStr = productId.toString();
+    const found = items.find(i => i.product_id === productIdStr);
+    const quantity = found ? found.quantity : 0;
+    console.log(`getQuantity - Product ID: ${productId}, Quantity: ${quantity}`);
+    return quantity;
   };
 
   const totalItems: number = items.reduce((sum, item) => sum + item.quantity, 0);

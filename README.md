@@ -175,6 +175,35 @@ Para generar el archivo APK para Android, sigue estos pasos:
    eas build -p android --profile preview --clear-cache
    ```
 
+7. **Botones + y - no funcionan en APK**:
+   ```bash
+   # Este problema se ha solucionado con las siguientes mejoras:
+   # - Funciones de base de datos convertidas a async/await
+   # - Mejor manejo de errores en CartContext
+   # - Logging detallado para debugging
+   # - Inicialización temprana de la base de datos
+   
+   # Si persiste el problema:
+   # 1. Verifica los logs en la consola durante las pruebas
+   # 2. Reconstruye el APK con caché limpia:
+   eas build -p android --profile preview --clear-cache
+   ```
+
+8. **Funcionalidad de Tarjeta de Crédito**:
+   ```bash
+   # Nueva funcionalidad implementada:
+   # - Pantalla de ingreso de datos de tarjeta
+   # - Validación de formulario en tiempo real
+   # - Navegación desde cart screen
+   # - Diseño coherente con la app
+   
+   # Para usar:
+   # 1. Ve al carrito
+   # 2. Selecciona "Tarjeta de Crédito"
+   # 3. Llena el formulario
+   # 4. Presiona "Aceptar" para regresar
+   ```
+
 ## Estructura del proyecto
 
 ```
